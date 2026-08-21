@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Log activity</title>
+</head>
+
+<body>
+    <header><span>MATTER WORKFLOW</span>
+        <h1>Declare task activity</h1>
+    </header>
+    <main>
+        <p class="notice">Only selected metadata is sent. Page content is never read.</p><label>User<select
+                id="user"></select></label><label>Assigned task<select id="task">
+                <option value="">Select a task</option>
+            </select></label><label>Action<select id="action">
+                <option value="opened">Opened</option>
+                <option value="updated">Updated</option>
+                <option value="reviewed">Reviewed</option>
+                <option value="submitted">Submitted</option>
+                <option value="completed">Completed</option>
+            </select></label><label>Axon record reference <input id="record" maxlength="256"
+                placeholder="Optional claim / record ID"></label><label>Completion note <textarea id="attestation"
+                maxlength="1000" placeholder="Optional attestation"></textarea></label><button id="send">Log declared
+            action</button>
+        <p id="result" role="status"></p>
+    </main>
+    <script src="popup.js"></script>
+</body>
+
+</html>

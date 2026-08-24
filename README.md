@@ -26,7 +26,14 @@ In Chrome or Edge, open the extensions page, enable Developer mode, choose **Loa
 
 ## Production shape
 
-`db/postgres-schema.sql` is the PostgreSQL migration contract. In production, replace the local SQLite connection in `server.js` with the approved Postgres driver/repository, enable TLS and enterprise SSO, use an external secrets manager, and replicate the approved `audit_events` projection to MotherDuck. SQLite is deliberately a local demonstration adapter, not a production storage recommendation.
+The application now uses MotherDuck as its database backend. For production deployment:
+
+1. Enable TLS and enterprise SSO for authentication
+2. Use an external secrets manager for the MotherDuck API key
+3. Consider implementing connection pooling for high-traffic scenarios
+4. The audit_events table provides an immutable, hash-chained audit trail
+
+`db/postgres-schema.sql` is the PostgreSQL migration contract if you need to migrate to PostgreSQL for specific compliance requirements.
 
 ## Security boundary
 

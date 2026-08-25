@@ -1,16 +1,132 @@
-const KEY='privileged-matter-workflow-pages-v1';
-const $=s=>document.querySelector(s); const id=()=>crypto.randomUUID(); const iso=()=>new Date().toISOString(); const esc=s=>String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); const fmt=s=>new Date(s).toLocaleString();
-const seed=()=>({users:[{id:'attorney',name:'Amaya Chen',role:'attorney'},{id:'business',name:'Jordan Lee',role:'business_user'},{id:'auditor',name:'Morgan Hall',role:'auditor'}],actorId:'attorney',matters:[],tasks:[],messages:[],events:[]});
-let state=JSON.parse(localStorage.getItem(KEY)||'null')||seed(), selected=null;
-const save=()=>localStorage.setItem(KEY,JSON.stringify(state)); const actor=()=>state.users.find(u=>u.id===state.actorId);
-function audit(matterId,taskId,type,source='web',payload={}){const previous=state.events.at(-1)?.eventHash||'GENESIS';state.events.push({id:id(),matterId,taskId,actorId:actor().id,type,source,payload,occurredAt:iso(),previousHash:previous,eventHash:`demo-${id().slice(0,8)}`});save()}
-function visibleMatters(){return state.matters.filter(m=>actor().role==='auditor'||m.members.includes(actor().id))}
-function renderList(){const matters=visibleMatters();$('#matter-list').innerHTML=matters.length?matters.map(m=>`<button class="matter-item ${m.id===selected?'active':''}" data-id="${m.id}"><b>${esc(m.title)}</b><br><small>${m.createdAt.slice(0,10)}</small></button>`).join(''):'<p class="hint">No accessible matters yet.</p>';document.querySelectorAll('.matter-item').forEach(x=>x.onclick=()=>select(x.dataset.id));}
-function render(){const a=actor();$('#who').textContent=`${a.name} · ${a.role.replace('_',' ')}`;$('#user-switch').innerHTML=state.users.map(u=>`<option value="${u.id}" ${u.id===a.id?'selected':''}>${u.name} (${u.role.replace('_',' ')})</option>`).join('');$('#member-select').innerHTML='<option value="">No additional member</option>'+state.users.filter(u=>u.role==='business_user').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');$('#assignee-select').innerHTML=state.users.filter(u=>u.role==='business_user').map(u=>`<option value="${u.id}">${u.name}</option>`).join('');renderList();if(selected&&visibleMatters().some(m=>m.id===selected))renderDetail();else{$('#detail').hidden=true;$('#empty').hidden=false}}
-function select(matterId){selected=matterId;renderList();renderDetail()}
-function renderDetail(){const m=state.matters.find(x=>x.id===selected);if(!m)return;$('#empty').hidden=true;$('#detail').hidden=false;$('#matter-title').textContent=m.title;$('#matter-description').textContent=m.description;$('#labels').innerHTML=[m.privilegeLabel&&'Attorney-client privilege',m.workProductLabel&&'Work product',m.selfAnalysisLabel&&'Critical self-analysis'].filter(Boolean).map(x=>`<span class="tag">${x}</span>`).join('');const tasks=state.tasks.filter(t=>t.matterId===m.id), messages=state.messages.filter(x=>x.matterId===m.id), events=state.events.filter(x=>x.matterId===m.id).toReversed();$('#tasks').innerHTML=tasks.length?tasks.map(t=>`<article class="task"><div><b>${esc(t.title)}</b><p>${esc(t.instructions)}</p><small>${esc(state.users.find(u=>u.id===t.assigneeId)?.name||'Unassigned')}${t.dueAt?' · due '+esc(t.dueAt):''}</small></div><button class="status" data-task="${t.id}">${t.status.replace('_',' ')}</button></article>`).join(''):'<p class="hint">No tasks assigned.</p>';document.querySelectorAll('[data-task]').forEach(b=>b.onclick=()=>advance(b.dataset.task));$('#messages').innerHTML=messages.length?messages.map(x=>`<div class="message"><b>${esc(state.users.find(u=>u.id===x.authorId)?.name||'Unknown')}</b><time>${fmt(x.createdAt)}</time><br>${esc(x.body)}</div>`).join(''):'<p class="hint">No conversation yet.</p>';$('#events').innerHTML=events.length?events.map(e=>`<div class="event"><b>${esc(e.type.replaceAll('.',' · '))}</b><time>${fmt(e.occurredAt)}</time><p>${esc(state.users.find(u=>u.id===e.actorId)?.name||'Unknown')} · ${esc(e.source)}</p></div>`).join(''):'<p class="hint">No audit events yet.</p>'}
-function advance(taskId){const t=state.tasks.find(x=>x.id===taskId), transitions={open:'in_progress',in_progress:'submitted',submitted:'closed',changes_requested:'in_progress'};if(!transitions[t.status])return;if(['closed'].includes(transitions[t.status])&&actor().role!=='attorney'){alert('Attorney review is required to close this task.');return}if(t.assigneeId!==actor().id&&actor().role!=='attorney'){alert('Only the assignee can update this task.');return}t.status=transitions[t.status];audit(t.matterId,t.id,`task.${t.status}`);save();renderDetail()}
-$('#user-switch').onchange=e=>{state.actorId=e.target.value;selected=null;save();render()};$('#new-matter').onclick=()=>{if(actor().role!=='attorney'){alert('Only an attorney may create a matter.');return}$('#matter-dialog').showModal()};$('#new-task').onclick=()=>{if(actor().role!=='attorney'){alert('Only an attorney may create a task.');return}$('#task-dialog').showModal()};
-$('#matter-form').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),m={id:id(),title:f.get('title').trim(),description:f.get('description'),privilegeLabel:f.has('privilegeLabel'),workProductLabel:f.has('workProductLabel'),selfAnalysisLabel:f.has('selfAnalysisLabel'),createdAt:iso(),members:[actor().id,...(f.get('memberId')?[f.get('memberId')]:[])]};state.matters.push(m);audit(m.id,null,'matter.created','web',{title:m.title});save();$('#matter-dialog').close();e.target.reset();selected=m.id;render()};
-$('#task-form').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),t={id:id(),matterId:selected,title:f.get('title').trim(),instructions:f.get('instructions'),assigneeId:f.get('assigneeId'),dueAt:f.get('dueAt'),status:'open',createdAt:iso()};state.tasks.push(t);audit(selected,t.id,'task.created','web',{title:t.title});save();$('#task-dialog').close();e.target.reset();renderDetail()};
-$('#message-form').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target),body=f.get('body').trim();if(!body)return;state.messages.push({id:id(),matterId:selected,authorId:actor().id,body,createdAt:iso()});audit(selected,null,'message.sent');save();e.target.reset();renderDetail()};$('#reset-demo').onclick=()=>{if(confirm('Delete this browser’s demo data?')){localStorage.removeItem(KEY);state=seed();selected=null;render()}};render();
+const API = 'http://localhost:3001';
+let state = { actor: null, users: [], matters: [], selected: null };
+const $ = s => document.querySelector(s);
+const api = async (path, opts = {}) => {
+  const r = await fetch(API + path, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      'X-User-Id': state.actor?.id || 'user-attorney',
+      ...(opts.headers || {})
+    }
+  });
+  const d = await r.json();
+  if (!r.ok) throw Error(d.error || 'Request failed');
+  return d;
+};
+const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = s => new Date(s).toLocaleString();
+
+async function boot() {
+  const d = await api('/api/bootstrap');
+  state = { ...state, ...d };
+  $('#who').textContent = `${d.actor.display_name} · ${d.actor.role.replace('_', ' ')}`;
+  $('#user-switch').innerHTML = d.users.map(u => `<option value="${u.id}" ${u.id === d.actor.id ? 'selected' : ''}>${esc(u.display_name)} (${u.role.replace('_', ' ')})</option>`).join('');
+  $('#member-select').innerHTML = '<option value="">No additional member</option>' + d.users.filter(u => u.role === 'business_user').map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('');
+  $('#assignee-select').innerHTML = d.users.filter(u => u.role === 'business_user').map(u => `<option value="${u.id}">${esc(u.display_name)}</option>`).join('');
+  renderList();
+  if (state.selected) await selectMatter(state.selected);
+}
+
+function renderList() {
+  $('#matter-list').innerHTML = state.matters.length ? state.matters.map(m => `<button class="matter-item ${m.id === state.selected ? 'active' : ''}" data-id="${m.id}"><b>${esc(m.title)}</b><br><small>${esc(m.created_at.slice(0, 10))}</small></button>`).join('') : '<p class="hint">No matters yet.</p>';
+  document.querySelectorAll('.matter-item').forEach(b => b.onclick = () => selectMatter(b.dataset.id));
+}
+
+async function selectMatter(id) {
+  state.selected = id;
+  renderList();
+  const d = await api(`/api/matters/${id}`);
+  $('#empty').hidden = true;
+  $('#detail').hidden = false;
+  const m = d.matter;
+  $('#matter-title').textContent = m.title;
+  $('#matter-description').textContent = m.description;
+  $('#labels').innerHTML = [m.privilege_label && 'Attorney-client privilege', m.work_product_label && 'Work product', m.self_analysis_label && 'Critical self-analysis'].filter(Boolean).map(x => `<span class="tag">${x}</span>`).join('');
+  $('#tasks').innerHTML = d.tasks.length ? d.tasks.map(t => `<article class="task"><div><b>${esc(t.title)}</b><p>${esc(t.instructions)}</p><small>${esc(t.assignee_name || 'Unassigned')}${t.due_at ? ' · due ' + esc(t.due_at) : ''}</small></div><button class="status" data-task="${t.id}" data-status="${t.status}">${t.status.replace('_', ' ')}</button></article>`).join('') : '<p class="hint">No tasks assigned.</p>';
+  document.querySelectorAll('[data-task]').forEach(b => b.onclick = () => advance(b.dataset.task, b.dataset.status));
+  $('#messages').innerHTML = d.messages.map(x => `<div class="message"><b>${esc(x.author_name)}</b><time>${fmt(x.created_at)}</time><br>${esc(x.body)}</div>`).join('') || '<p class="hint">No conversation yet.</p>';
+  $('#events').innerHTML = d.events.map(e => `<div class="event"><b>${esc(e.event_type.replaceAll('.', ' · '))}</b><time>${fmt(e.occurred_at)}</time><p>${esc(e.actor_name)} · ${esc(e.source)}</p></div>`).join('') || '<p class="hint">No audit events yet.</p>';
+}
+
+async function advance(id, status) {
+  const flow = { open: 'in_progress', in_progress: 'submitted', submitted: 'closed', changes_requested: 'in_progress', closed: 'closed' };
+  if (flow[status] === status) return;
+  try {
+    await api(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify({ status: flow[status] }) });
+    await selectMatter(state.selected);
+  } catch (e) {
+    alert(e.message);
+  }
+}
+
+$('#user-switch').onchange = async e => {
+  state.actor = { id: e.target.value };
+  state.selected = null;
+  await boot();
+};
+
+$('#new-matter').onclick = () => $('#matter-dialog').showModal();
+$('#new-task').onclick = () => $('#task-dialog').showModal();
+
+$('#matter-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  try {
+    const d = await api('/api/matters', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: f.get('title'),
+        description: f.get('description'),
+        privilegeLabel: f.has('privilegeLabel'),
+        workProductLabel: f.has('workProductLabel'),
+        selfAnalysisLabel: f.has('selfAnalysisLabel'),
+        memberIds: f.get('memberId') ? [f.get('memberId')] : []
+      })
+    });
+    $('#matter-dialog').close();
+    e.target.reset();
+    state.selected = d.id;
+    await boot();
+  } catch (x) {
+    alert(x.message);
+  }
+};
+
+$('#task-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  try {
+    await api(`/api/matters/${state.selected}/tasks`, {
+      method: 'POST',
+      body: JSON.stringify({
+        title: f.get('title'),
+        instructions: f.get('instructions'),
+        assigneeId: f.get('assigneeId'),
+        dueAt: f.get('dueAt') || null
+      })
+    });
+    $('#task-dialog').close();
+    e.target.reset();
+    await selectMatter(state.selected);
+  } catch (x) {
+    alert(x.message);
+  }
+};
+
+$('#message-form').onsubmit = async e => {
+  e.preventDefault();
+  const f = new FormData(e.target);
+  try {
+    await api(`/api/matters/${state.selected}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ body: f.get('body') })
+    });
+    e.target.reset();
+    await selectMatter(state.selected);
+  } catch (x) {
+    alert(x.message);
+  }
+};
+
+boot().catch(e => alert(e.message));

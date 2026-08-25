@@ -58,4 +58,4 @@ const api = async (req, res) => {
   return json(res, 404, { error: 'Not found' });
 };
 const server = http.createServer(async (req, res) => { try { if (req.url.startsWith('/api/')) return await api(req, res); const file = req.url === '/' ? 'index.html' : req.url.slice(1); if (!/^[\w.-]+$/.test(file)) throw Error('Not found'); const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css' }; const text = await readFile(path.join(root, 'public', file)); res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'text/plain' }); res.end(text); } catch (e) { json(res, e.message === 'Not found' ? 404 : 500, { error: e.message }); } });
-server.listen(process.env.PORT || 3000, () => console.log(`Privileged Matter Workflow listening on http://localhost:${process.env.PORT || 3000}`));
+server.listen(process.env.PORT || 3001, () => console.log(`Privileged Matter Workflow listening on http://localhost:${process.env.PORT || 3001}`));

@@ -16,13 +16,13 @@ The Pages version is a presentation/demo only. It stores matter, task, chat, and
 
 ## Run locally
 
-Requires Node 24. Run `npm start`, then open `http://localhost:3000`. The local demo uses Node's built-in SQLite database at `data/workflow.sqlite`; it is seeded with a tenant, an attorney, a business user, and an auditor. Use **Switch user** to exercise role-based access.
+Requires Node 24. Run `npm start`, then open `http://localhost:3001`. The local demo uses Node's built-in SQLite database at `data/workflow.sqlite`; it is seeded with a tenant, an attorney, a business user, and an auditor. Use **Switch user** to exercise role-based access.
 
 The local demo's identity header/user switch exists solely to make role testing easy. Production authentication must derive identity and tenant claims from a verified session or SSO token; never accept a user identity from a browser-controlled header.
 
 ## Browser extension
 
-In Chrome or Edge, open the extensions page, enable Developer mode, choose **Load unpacked**, and select `extension/`. Start the web app first. The extension talks only to `http://localhost:3000` in development and records a user-selected task plus a declared action. It never reads page contents, keypresses, passwords, or screenshots.
+In Chrome or Edge, open the extensions page, enable Developer mode, choose **Load unpacked**, and select `extension/`. Start the web app first. The extension talks only to `http://localhost:3001` in development and records a user-selected task plus a declared action. It never reads page contents, keypresses, passwords, or screenshots.
 
 ## Production shape
 

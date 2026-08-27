@@ -3,7 +3,7 @@ name: Deploy Public Folder to Pages
 on:
   push:
     branches:
-      - main # Change this to master if needed
+      - master # Change this to master if needed
 
 permissions:
   contents: read

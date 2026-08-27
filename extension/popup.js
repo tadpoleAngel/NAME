@@ -1,23 +1,42 @@
-const API = 'http://localhost:3001';
 const $ = s => document.querySelector(s);
 let actorId = 'user-business', tasks = [];
 
+// API URL
+const API = 'http://localhost:3001';
+
 async function call(path, opts = {}) {
+  const token = await getAuthToken();
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` })
+  };
+
   const r = await fetch(API + path, {
     ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': actorId
-    }
+    headers
   });
+  
   const d = await r.json();
-  if (!r.ok) throw Error(d.error || 'Request failed');
+  if (!r.ok) {
+    if (r.status === 401) {
+      throw new Error('Authentication required. Please login to the main application.');
+    }
+    throw new Error(d.error || 'Request failed');
+  }
   return d;
+}
+
+async function getAuthToken() {
+  const result = await chrome.storage.local.get(['auth_token']);
+  return result.auth_token || null;
 }
 
 async function load() {
   const d = await call('/api/bootstrap');
-  $('#user').innerHTML = d.users.map(u => `<option value="${u.id}" ${u.id === actorId ? 'selected' : ''}>${u.display_name}</option>`).join('');
+  // Set current user from authenticated session
+  actorId = d.actor.id;
+  $('#user').innerHTML = `<option value="${d.actor.id}" selected>${d.actor.display_name}</option>`;
+  $('#user').disabled = true; // Disable user switching with JWT auth
   tasks = [];
   for (const m of d.matters) {
     const info = await call('/api/matters/' + m.id);
@@ -25,11 +44,6 @@ async function load() {
   }
   $('#task').innerHTML = '<option value="">Select a task</option>' + tasks.map(t => `<option value="${t.id}">${t.matterTitle}: ${t.title}</option>`).join('');
 }
-
-$('#user').onchange = async e => {
-  actorId = e.target.value;
-  await load();
-};
 
 $('#send').onclick = async () => {
   const taskId = $('#task').value;

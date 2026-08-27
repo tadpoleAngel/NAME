@@ -1,61 +1,107 @@
-import http from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { createHash, randomUUID } from 'node:crypto';
-import { DuckDBInstance } from '@duckdb/node-api';
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 import dotenv from 'dotenv';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { initializeDatabase, closeDatabase } from './src/config/database.js';
+import { errorHandler, notFound } from './src/middleware/errorHandler.js';
+
+import authRoutes from './src/routes/auth.js';
+import bootstrapRoutes from './src/routes/bootstrap.js';
+import matterRoutes from './src/routes/matters.js';
+import taskRoutes from './src/routes/tasks.js';
+import messageRoutes from './src/routes/messages.js';
+import extensionRoutes from './src/routes/extension.js';
+
 dotenv.config();
 
-const root = path.dirname(fileURLToPath(import.meta.url));
-const token = process.env.MOTHERDUCK_API_KEY;
-const database = process.env.MOTHERDUCK_DATABASE || 'privileged_matter_workflow';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PORT = process.env.PORT || 3001;
 
-const instance = await DuckDBInstance.fromCache(`md:${database}`, {
-  motherduck_token: token,
+const app = express();
+
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: false, // Disable CSP for development
+  crossOriginEmbedderPolicy: false
+}));
+
+// CORS configuration
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || '*',
+  credentials: true
+}));
+
+// Rate limiting
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again later.'
 });
-const connection = await instance.connect();
+app.use('/api/', limiter);
 
-// Initialize database schema
-await connection.run(`
-CREATE SCHEMA IF NOT EXISTS main;
+// Body parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-CREATE TABLE IF NOT EXISTS main.tenants(id TEXT PRIMARY KEY, name TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS main.users(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, email TEXT NOT NULL, display_name TEXT NOT NULL, role TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS main.matters(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', privilege_label INTEGER NOT NULL, work_product_label INTEGER NOT NULL, self_analysis_label INTEGER NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS main.matter_members(matter_id TEXT NOT NULL, user_id TEXT NOT NULL, PRIMARY KEY(matter_id,user_id));
-CREATE TABLE IF NOT EXISTS main.tasks(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, matter_id TEXT NOT NULL, title TEXT NOT NULL, instructions TEXT NOT NULL, assignee_id TEXT, due_at TEXT, status TEXT NOT NULL, created_by TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS main.messages(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, matter_id TEXT NOT NULL, author_id TEXT NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL);
-CREATE TABLE IF NOT EXISTS main.audit_events(id TEXT PRIMARY KEY, tenant_id TEXT NOT NULL, matter_id TEXT, task_id TEXT, actor_id TEXT NOT NULL, event_type TEXT NOT NULL, source TEXT NOT NULL, payload TEXT NOT NULL, occurred_at TEXT NOT NULL, previous_hash TEXT NOT NULL, event_hash TEXT NOT NULL UNIQUE);
-`);
+// API routes
+app.use('/api/auth', authRoutes);
+app.use('/api/bootstrap', bootstrapRoutes);
+app.use('/api/matters', matterRoutes);
+app.use('/api/tasks', taskRoutes);
+app.use('/api/messages', messageRoutes);
+app.use('/api/extension', extensionRoutes);
 
-const ids = { tenant: 'tenant-demo', attorney: 'user-attorney', user: 'user-business', auditor: 'user-auditor' };
-const tenantCheck = await connection.runAndReadAll(`SELECT id FROM main.tenants WHERE id='${ids.tenant}'`);
-if (tenantCheck.getRowObjects().length === 0) {
-  await connection.run(`INSERT INTO main.tenants VALUES ('${ids.tenant}', 'Northwind Claims')`);
-  for (const [id, email, name, role] of [[ids.attorney, 'amaya.chen@northwind.test', 'Amaya Chen', 'attorney'], [ids.user, 'jordan.lee@northwind.test', 'Jordan Lee', 'business_user'], [ids.auditor, 'auditor@northwind.test', 'Morgan Hall', 'auditor']]) {
-    await connection.run(`INSERT INTO main.users VALUES ('${id}', '${ids.tenant}', '${email}', '${name}', '${role}')`);
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Serve static files from public directory
+app.use(express.static(path.join(__dirname, 'public')));
+
+// Serve docs directory for GitHub Pages demo
+app.use('/docs', express.static(path.join(__dirname, 'docs')));
+
+// 404 handler
+app.use(notFound);
+
+// Error handler
+app.use(errorHandler);
+
+// Initialize database and start server
+async function startServer() {
+  try {
+    await initializeDatabase();
+    console.log('Database initialized successfully');
+
+    app.listen(PORT, () => {
+      console.log(`Privileged Matter Workflow API listening on http://localhost:${PORT}`);
+      console.log(`Health check: http://localhost:${PORT}/health`);
+      console.log(`Frontend: http://localhost:${PORT}/`);
+      console.log(`Docs demo: http://localhost:${PORT}/docs/`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
   }
 }
-const json = (res, code, body) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': 'Content-Type, X-User-Id' }); res.end(JSON.stringify(body)); };
-const now = () => new Date().toISOString();
-async function user(req) { const id = req.headers['x-user-id'] || ids.attorney; const result = await connection.runAndReadAll(`SELECT * FROM main.users WHERE id='${id}'`); return result.getRowObjects()[0]; }
-async function allowed(actor, matterId) { if (!actor || actor.role === 'platform_admin' || actor.role === 'tenant_admin' || actor.role === 'auditor') return !!actor; const result = await connection.runAndReadAll(`SELECT 1 FROM main.matter_members WHERE matter_id='${matterId}' AND user_id='${actor.id}'`); return result.getRowObjects().length > 0; }
-async function writeAudit({ tenantId, matterId = null, taskId = null, actor, eventType, source, payload = {} }) { const previousResult = await connection.runAndReadAll(`SELECT event_hash FROM main.audit_events WHERE tenant_id='${tenantId}' ORDER BY occurred_at DESC, id DESC LIMIT 1`); const previous = previousResult.getRowObjects()[0]?.event_hash || 'GENESIS'; const occurredAt = now(), id = randomUUID(); const canonical = JSON.stringify({ id, tenantId, matterId, taskId, actorId: actor.id, eventType, source, payload, occurredAt, previous }); const hash = createHash('sha256').update(canonical).digest('hex'); await connection.run(`INSERT INTO main.audit_events VALUES ('${id}', '${tenantId}', ${matterId ? `'${matterId}'` : 'NULL'}, ${taskId ? `'${taskId}'` : 'NULL'}, '${actor.id}', '${eventType}', '${source}', '${JSON.stringify(payload).replace(/'/g, "''")}', '${occurredAt}', '${previous}', '${hash}')`); return { id, hash }; }
-async function body(req) { let raw = ''; for await (const chunk of req) raw += chunk; try { return raw ? JSON.parse(raw) : {} } catch { throw Error('Invalid JSON'); } }
-function requireRole(actor, ...roles) { return actor && roles.includes(actor.role); }
 
-const api = async (req, res) => {
-  if (req.method === 'OPTIONS') return json(res, 204, {}); const url = new URL(req.url, 'http://localhost'); const actor = await user(req); if (!actor) return json(res, 401, { error: 'Unknown user' });
-  if (req.method === 'GET' && url.pathname === '/api/bootstrap') { const mattersResult = await connection.runAndReadAll(`SELECT m.* FROM main.matters m WHERE m.tenant_id='${actor.tenant_id}' AND ('${actor.role}' IN ('platform_admin','tenant_admin','auditor') OR EXISTS(SELECT 1 FROM main.matter_members mm WHERE mm.matter_id=m.id AND mm.user_id='${actor.id}')) ORDER BY m.created_at DESC`); const usersResult = await connection.runAndReadAll(`SELECT id,display_name,role FROM main.users WHERE tenant_id='${actor.tenant_id}'`); return json(res, 200, { actor, users: usersResult.getRowObjects(), matters: mattersResult.getRowObjects() }); }
-  if (req.method === 'POST' && url.pathname === '/api/matters') { if (!requireRole(actor, 'attorney', 'tenant_admin')) return json(res, 403, { error: 'Only attorneys may create matters' }); const b = await body(req), id = randomUUID(); if (!b.title?.trim()) return json(res, 400, { error: 'Title is required' }); const memberIds = []; for (const memberId of (b.memberIds || [])) { const userCheck = await connection.runAndReadAll(`SELECT 1 FROM main.users WHERE id='${memberId}' AND tenant_id='${actor.tenant_id}'`); if (userCheck.getRowObjects().length > 0) memberIds.push(memberId); } await connection.run(`INSERT INTO main.matters VALUES ('${id}', '${actor.tenant_id}', '${b.title.trim()}', '${b.description || ''}', ${+!!b.privilegeLabel}, ${+!!b.workProductLabel}, ${+!!b.selfAnalysisLabel}, '${actor.id}', '${now()}')`); await connection.run(`INSERT INTO main.matter_members VALUES ('${id}', '${actor.id}')`); for (const memberId of memberIds) await connection.run(`INSERT OR IGNORE INTO main.matter_members VALUES ('${id}', '${memberId}')`); await writeAudit({ tenantId: actor.tenant_id, matterId: id, actor, eventType: 'matter.created', source: 'web', payload: { title: b.title } }); return json(res, 201, { id }); }
-  const matterMatch = url.pathname.match(/^\/api\/matters\/([^/]+)$/); if (req.method === 'GET' && matterMatch) { const matterResult = await connection.runAndReadAll(`SELECT * FROM main.matters WHERE id='${matterMatch[1]}' AND tenant_id='${actor.tenant_id}'`); const matter = matterResult.getRowObjects()[0]; if (!matter || !(await allowed(actor, matter.id))) return json(res, 404, { error: 'Matter not found' }); const tasksResult = await connection.runAndReadAll(`SELECT t.*, u.display_name assignee_name FROM main.tasks t LEFT JOIN main.users u ON u.id=t.assignee_id WHERE t.matter_id='${matter.id}' ORDER BY t.updated_at DESC`); const messagesResult = await connection.runAndReadAll(`SELECT ms.*, u.display_name author_name FROM main.messages ms JOIN main.users u ON u.id=ms.author_id WHERE ms.matter_id='${matter.id}' ORDER BY ms.created_at`); const eventsResult = await connection.runAndReadAll(`SELECT ae.*,u.display_name actor_name FROM main.audit_events ae JOIN main.users u ON u.id=ae.actor_id WHERE ae.matter_id='${matter.id}' ORDER BY ae.occurred_at DESC,ae.id DESC`); const events = eventsResult.getRowObjects().map(e => ({ ...e, payload: JSON.parse(e.payload) })); return json(res, 200, { matter, tasks: tasksResult.getRowObjects(), messages: messagesResult.getRowObjects(), events }); }
-  const taskRoute = url.pathname.match(/^\/api\/matters\/([^/]+)\/tasks$/); if (req.method === 'POST' && taskRoute) { const matterId = taskRoute[1]; const matterResult = await connection.runAndReadAll(`SELECT id FROM main.matters WHERE id='${matterId}' AND tenant_id='${actor.tenant_id}'`); const matter = matterResult.getRowObjects()[0]; if (!matter || !(await allowed(actor, matterId)) || !requireRole(actor, 'attorney', 'tenant_admin')) return json(res, 403, { error: 'Only matter attorneys may assign tasks' }); const b = await body(req), id = randomUUID(); const assigneeResult = await connection.runAndReadAll(`SELECT id FROM main.users WHERE id='${b.assigneeId}' AND tenant_id='${actor.tenant_id}'`); const assignee = assigneeResult.getRowObjects()[0]; if (!b.title?.trim()) return json(res, 400, { error: 'Task title is required' }); await connection.run(`INSERT INTO main.tasks VALUES ('${id}', '${actor.tenant_id}', '${matterId}', '${b.title.trim()}', '${b.instructions || ''}', ${assignee?.id ? `'${assignee.id}'` : 'NULL'}, ${b.dueAt ? `'${b.dueAt}'` : 'NULL'}, 'open', '${actor.id}', '${now()}', '${now()}')`); await writeAudit({ tenantId: actor.tenant_id, matterId, taskId: id, actor, eventType: 'task.created', source: 'web', payload: { title: b.title, assigneeId: assignee?.id || null } }); return json(res, 201, { id }); }
-  const messageRoute = url.pathname.match(/^\/api\/matters\/([^/]+)\/messages$/); if (req.method === 'POST' && messageRoute) { const matterId = messageRoute[1]; const matterResult = await connection.runAndReadAll(`SELECT id FROM main.matters WHERE id='${matterId}' AND tenant_id='${actor.tenant_id}'`); const matter = matterResult.getRowObjects()[0]; if (!matter || !(await allowed(actor, matterId))) return json(res, 403, { error: 'No matter access' }); const b = await body(req), id = randomUUID(); if (!b.body?.trim()) return json(res, 400, { error: 'Message cannot be empty' }); await connection.run(`INSERT INTO main.messages VALUES ('${id}', '${actor.tenant_id}', '${matterId}', '${actor.id}', '${b.body.trim()}', '${now()}')`); await writeAudit({ tenantId: actor.tenant_id, matterId, actor, eventType: 'message.sent', source: 'web', payload: { messageId: id } }); return json(res, 201, { id }); }
-  const taskUpdate = url.pathname.match(/^\/api\/tasks\/([^/]+)$/); if (req.method === 'PATCH' && taskUpdate) { const taskResult = await connection.runAndReadAll(`SELECT * FROM main.tasks WHERE id='${taskUpdate[1]}' AND tenant_id='${actor.tenant_id}'`); const task = taskResult.getRowObjects()[0]; if (!task || !(await allowed(actor, task.matter_id))) return json(res, 404, { error: 'Task not found' }); const b = await body(req), status = b.status; const permitted = ['open', 'in_progress', 'submitted', 'changes_requested', 'closed']; if (!permitted.includes(status)) return json(res, 400, { error: 'Invalid status' }); const attorneyAction = ['changes_requested', 'closed'].includes(status); if (attorneyAction && !requireRole(actor, 'attorney', 'tenant_admin')) return json(res, 403, { error: 'Attorney review required' }); if (!attorneyAction && task.assignee_id !== actor.id && !requireRole(actor, 'attorney', 'tenant_admin')) return json(res, 403, { error: 'Only assignee may update task' }); await connection.run(`UPDATE main.tasks SET status='${status}',updated_at='${now()}' WHERE id='${task.id}'`); await writeAudit({ tenantId: actor.tenant_id, matterId: task.matter_id, taskId: task.id, actor, eventType: `task.${status}`, source: 'web', payload: { note: b.note || '' } }); return json(res, 200, { ok: true }); }
-  if (req.method === 'POST' && url.pathname === '/api/extension/events') { const b = await body(req); const taskResult = await connection.runAndReadAll(`SELECT * FROM main.tasks WHERE id='${b.taskId}' AND tenant_id='${actor.tenant_id}'`); const task = taskResult.getRowObjects()[0]; if (!task || task.assignee_id !== actor.id || !(await allowed(actor, task.matter_id))) return json(res, 403, { error: 'Select a task assigned to you' }); const actions = ['opened', 'updated', 'reviewed', 'submitted', 'completed']; if (!actions.includes(b.action)) return json(res, 400, { error: 'Invalid declared action' }); const destination = String(b.destination || '').slice(0, 512); const recordRef = String(b.recordRef || '').slice(0, 256); await writeAudit({ tenantId: actor.tenant_id, matterId: task.matter_id, taskId: task.id, actor, eventType: `activity.${b.action}`, source: b.connector === 'axon' ? 'extension.axon' : 'extension.generic', payload: { destination, recordRef, attestation: String(b.attestation || '').slice(0, 1000) } }); return json(res, 201, { ok: true }); }
-  return json(res, 404, { error: 'Not found' });
-};
-const server = http.createServer(async (req, res) => { try { if (req.url.startsWith('/api/')) return await api(req, res); const file = req.url === '/' ? 'index.html' : req.url.slice(1); if (!/^[\w.-]+$/.test(file)) throw Error('Not found'); const types = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css' }; const text = await readFile(path.join(root, 'public', file)); res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'text/plain' }); res.end(text); } catch (e) { json(res, e.message === 'Not found' ? 404 : 500, { error: e.message }); } });
-server.listen(process.env.PORT || 3001, () => console.log(`Privileged Matter Workflow listening on http://localhost:${process.env.PORT || 3001}`));
+// Graceful shutdown
+process.on('SIGTERM', async () => {
+  console.log('SIGTERM signal received: closing HTTP server');
+  await closeDatabase();
+  process.exit(0);
+});
+
+process.on('SIGINT', async () => {
+  console.log('SIGINT signal received: closing HTTP server');
+  await closeDatabase();
+  process.exit(0);
+});
+
+startServer();

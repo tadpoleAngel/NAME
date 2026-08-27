@@ -5,10 +5,17 @@
   "type": "module",
   "scripts": {
     "start": "node server.js",
+    "dev": "node server.js",
     "test": "node --test test/*.test.js"
   },
   "dependencies": {
     "@duckdb/node-api": "^1.5.5-r.4",
-    "dotenv": "^16.4.5"
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^16.4.5",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3"
   }
 }

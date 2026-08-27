@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Login - Privileged Matter Workflow</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .login-container {
+      max-width: 500px;
+      margin: 100px auto;
+      padding: 2rem;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .login-container h1 {
+      margin-bottom: 0.5rem;
+      color: #1a1a2e;
+      text-align: center;
+    }
+    .login-container .subtitle {
+      text-align: center;
+      color: #666;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+    .role-selection {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .role-card {
+      padding: 1.5rem;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+    .role-card:hover {
+      border-color: #4a90e2;
+      background: #f8f9fa;
+    }
+    .role-card.selected {
+      border-color: #4a90e2;
+      background: #e8f4fd;
+    }
+    .role-icon {
+      font-size: 2rem;
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #f0f0f0;
+      border-radius: 50%;
+    }
+    .role-info h3 {
+      margin: 0 0 0.25rem 0;
+      color: #333;
+    }
+    .role-info p {
+      margin: 0;
+      color: #666;
+      font-size: 0.85rem;
+    }
+    .login-btn {
+      width: 100%;
+      padding: 1rem;
+      background: #4a90e2;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 1.5rem;
+    }
+    .login-btn:hover {
+      background: #357abd;
+    }
+    .login-btn:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+    .error {
+      color: #e74c3c;
+      font-size: 0.875rem;
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .demo-note {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 4px;
+      font-size: 0.8rem;
+      color: #666;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <div class="login-container">
+    <h1>Privileged Matter Workflow</h1>
+    <p class="subtitle">Select your role to continue</p>
+    
+    <div class="role-selection">
+      <div class="role-card" data-role="attorney" data-email="amaya.chen@northwind.test">
+        <div class="role-icon">⚖️</div>
+        <div class="role-info">
+          <h3>Attorney</h3>
+          <p>Create matters, assign tasks, review work</p>
+        </div>
+      </div>
+      
+      <div class="role-card" data-role="business_user" data-email="jordan.lee@northwind.test">
+        <div class="role-icon">💼</div>
+        <div class="role-info">
+          <h3>Business User</h3>
+          <p>Complete assigned tasks, provide updates</p>
+        </div>
+      </div>
+      
+      <div class="role-card" data-role="auditor" data-email="auditor@northwind.test">
+        <div class="role-icon">🔍</div>
+        <div class="role-info">
+          <h3>Auditor</h3>
+          <p>Review all matters and audit trails</p>
+        </div>
+      </div>
+    </div>
+    
+    <button class="login-btn" id="loginBtn" disabled>Continue as Attorney</button>
+    <div id="error" class="error"></div>
+    
+    <div class="demo-note">
+      <strong>Demo Mode:</strong> Select a role to simulate authentication. 
+      In production, this will be replaced with proper login/SSO.
+    </div>
+  </div>
+  
+  <script>
+    // Set API URL globally before loading auth.js
+    window.API = 'http://localhost:3001';
+  </script>
+  <script src="auth.js"></script>
+  <script>
+    const roleCards = document.querySelectorAll('.role-card');
+    const loginBtn = document.getElementById('loginBtn');
+    const errorDiv = document.getElementById('error');
+    
+    let selectedRole = null;
+    let selectedEmail = null;
+    
+    roleCards.forEach(card => {
+      card.addEventListener('click', () => {
+        // Remove selected class from all cards
+        roleCards.forEach(c => c.classList.remove('selected'));
+        
+        // Add selected class to clicked card
+        card.classList.add('selected');
+        
+        // Store selection
+        selectedRole = card.dataset.role;
+        selectedEmail = card.dataset.email;
+        
+        // Update button
+        const roleNames = {
+          'attorney': 'Attorney',
+          'business_user': 'Business User', 
+          'auditor': 'Auditor'
+        };
+        loginBtn.textContent = `Continue as ${roleNames[selectedRole]}`;
+        loginBtn.disabled = false;
+        
+        errorDiv.textContent = '';
+      });
+    });
+    
+    loginBtn.addEventListener('click', async () => {
+      if (!selectedRole || !selectedEmail) {
+        errorDiv.textContent = 'Please select a role';
+        return;
+      }
+      
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'Logging in...';
+      errorDiv.textContent = '';
+      
+      try {
+        const user = await window.authAPI.login(selectedEmail);
+        console.log('Login successful:', user);
+        window.location.href = '/docs/';
+      } catch (error) {
+        errorDiv.textContent = error.message || 'Login failed';
+        loginBtn.disabled = false;
+        loginBtn.textContent = `Continue as ${selectedRole.charAt(0).toUpperCase() + selectedRole.slice(1)}`;
+      }
+    });
+    
+    // Check if already authenticated
+    if (window.authAPI.isAuthenticated()) {
+      window.location.href = '/docs/';
+    }
+  </script>
+</body>
+</html>

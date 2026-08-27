@@ -1,17 +1,27 @@
-const API = 'http://localhost:3001';
 let state = { actor: null, users: [], matters: [], selected: null };
 const $ = s => document.querySelector(s);
 const api = async (path, opts = {}) => {
-  const r = await fetch(API + path, {
+  const token = localStorage.getItem('auth_token');
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(token && { 'Authorization': `Bearer ${token}` }),
+    ...(opts.headers || {})
+  };
+
+  const r = await fetch(window.API + path, {
     ...opts,
-    headers: {
-      'Content-Type': 'application/json',
-      'X-User-Id': state.actor?.id || 'user-attorney',
-      ...(opts.headers || {})
-    }
+    headers
   });
+  
   const d = await r.json();
-  if (!r.ok) throw Error(d.error || 'Request failed');
+  if (!r.ok) {
+    if (r.status === 401) {
+      // Token expired or invalid, redirect to login
+      localStorage.removeItem('auth_token');
+      window.location.href = '/docs/role-login.html';
+    }
+    throw new Error(d.error || 'Request failed');
+  }
   return d;
 };
 const esc = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -129,4 +139,14 @@ $('#message-form').onsubmit = async e => {
   }
 };
 
-boot().catch(e => alert(e.message));
+$('#logout-btn').onclick = () => {
+  localStorage.removeItem('auth_token');
+  window.location.href = '/docs/role-login.html';
+};
+
+// Check authentication before booting
+if (!localStorage.getItem('auth_token')) {
+  window.location.href = '/docs/role-login.html';
+} else {
+  boot().catch(e => alert(e.message));
+}

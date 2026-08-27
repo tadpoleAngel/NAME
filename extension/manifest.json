@@ -7,7 +7,11 @@
     "default_popup": "popup.html",
     "default_title": "Log task activity"
   },
+  "background": {
+    "service_worker": "background.js"
+  },
   "permissions": [
+    "storage",
     "tabs"
   ],
   "host_permissions": [

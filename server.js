@@ -32,7 +32,7 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*',
+  origin: process.env.CORS_ORIGIN || '*', // Allow all origins for development
   credentials: true
 }));
 
@@ -79,11 +79,12 @@ async function startServer() {
     await initializeDatabase();
     console.log('Database initialized successfully');
 
-    app.listen(PORT, () => {
+    app.listen(PORT, '0.0.0.0', () => {
       console.log(`Privileged Matter Workflow API listening on http://localhost:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`Frontend: http://localhost:${PORT}/`);
       console.log(`Docs demo: http://localhost:${PORT}/docs/`);
+      console.log(`Network access: http://YOUR_LOCAL_IP:${PORT}`);
     });
   } catch (error) {
     console.error('Failed to start server:', error);

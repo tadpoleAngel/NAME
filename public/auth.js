@@ -1,4 +1,10 @@
-window.API = 'http://localhost:3001';
+// API Configuration
+const isLocalhost = window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1' ||
+                     window.location.hostname === '';
+
+// You can override this by setting window.API before loading this script
+window.API = window.API || (isLocalhost ? 'http://localhost:3001' : 'https://name-ray5.onrender.com');
 
 // Token management
 function getToken() {

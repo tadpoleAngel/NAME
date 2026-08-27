@@ -92,7 +92,6 @@ npm start
 
 The server will start on `http://localhost:3001` with:
 - Main app: `http://localhost:3001/`
-- Docs demo: `http://localhost:3001/docs/`
 - Health check: `http://localhost:3001/health`
 
 ## 🔌 API Endpoints
@@ -151,11 +150,6 @@ The current implementation provides:
 - Automatic token inclusion in API requests
 - Redirect to login on token expiration
 - Logout functionality
-
-### Docs Demo
-- Same authentication flow as main app
-- Separate login page at `/docs/login.html`
-- Shared auth.js library
 
 ### Browser Extension
 - Background script for token management

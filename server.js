@@ -64,8 +64,6 @@ app.get('/health', (req, res) => {
 // Serve static files from public directory
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Serve docs directory for GitHub Pages demo
-app.use('/docs', express.static(path.join(__dirname, 'docs')));
 
 // 404 handler
 app.use(notFound);
@@ -83,7 +81,6 @@ async function startServer() {
       console.log(`Privileged Matter Workflow API listening on http://localhost:${PORT}`);
       console.log(`Health check: http://localhost:${PORT}/health`);
       console.log(`Frontend: http://localhost:${PORT}/`);
-      console.log(`Docs demo: http://localhost:${PORT}/docs/`);
       console.log(`Network access: http://YOUR_LOCAL_IP:${PORT}`);
     });
   } catch (error) {

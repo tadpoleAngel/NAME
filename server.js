@@ -32,7 +32,7 @@ app.use(helmet({
 
 // CORS configuration
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || '*', // Allow all origins for development
+  origin: process.env.CORS_ORIGIN || 'https://tadpoleangel.github.io' || 'http://localhost:3001', // Allow all origins for development
   credentials: true
 }));
 

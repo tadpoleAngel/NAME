@@ -194,7 +194,7 @@
       try {
         const user = await window.authAPI.login(selectedEmail);
         console.log('Login successful:', user);
-        window.location.href = '/';
+        window.location.href = '/NAME/';
       } catch (error) {
         errorDiv.textContent = error.message || 'Login failed';
         loginBtn.disabled = false;
@@ -204,7 +204,7 @@
     
     // Check if already authenticated
     if (window.authAPI.isAuthenticated()) {
-      window.location.href = '/';
+      window.location.href = '/NAME/';
     }
   </script>
 </body>

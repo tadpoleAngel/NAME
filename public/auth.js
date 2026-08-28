@@ -42,7 +42,7 @@ async function api(path, opts = {}) {
     if (r.status === 401) {
       // Token expired or invalid, clear it
       removeToken();
-      window.location.href = '/role-login.html';
+      window.location.href = '/NAME/role-login.html';
     }
     throw Error(d.error || 'Request failed');
   }
@@ -79,7 +79,7 @@ async function getCurrentUser() {
 
 async function logout() {
   removeToken();
-  window.location.href = '/role-login.html';
+  window.location.href = '/NAME/role-login.html';
 }
 
 // Make functions available globally

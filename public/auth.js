@@ -60,10 +60,26 @@ async function login(email) {
   // Also set token in extension if available
   try {
     if (chrome && chrome.runtime) {
-      chrome.runtime.sendMessage({
-        action: 'setAuthToken',
-        token: d.token
-      });
+      // Try to get extension ID from localStorage or use a placeholder
+      const extensionId = localStorage.getItem('extension_id') || 'YOUR_EXTENSION_ID_HERE';
+      
+      // Try to send message to extension
+      try {
+        chrome.runtime.sendMessage(extensionId, {
+          action: 'setAuthToken',
+          token: d.token
+        }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.log('Extension not reachable:', chrome.runtime.lastError.message);
+            console.log('Use the sync button in the extension to authenticate');
+          } else {
+            console.log('Token sent to extension successfully');
+          }
+        });
+      } catch (e) {
+        console.log('Extension communication failed:', e);
+        console.log('Use the sync button in the extension to authenticate');
+      }
     }
   } catch (e) {
     // Extension not available, that's fine

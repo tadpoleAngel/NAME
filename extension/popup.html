@@ -13,7 +13,12 @@
         <h1>Declare task activity</h1>
     </header>
     <main>
-        <p class="notice">Only selected metadata is sent. Page content is never read.</p><label>User<select
+        <p class="notice">Only selected metadata is sent. Page content is never read.</p>
+        <div id="syncSection" style="display: none;">
+            <button id="syncToken" style="margin-bottom: 10px; font-size: 12px; padding: 5px;">Sync Token from Main App</button>
+            <p class="notice" id="syncStatus"></p>
+            <p class="notice" style="font-size: 11px; color: #666;">Click sync while on the main app to enable logging on any site</p>
+        </div><label>User<select
                 id="user"></select></label><label>Assigned task<select id="task">
                 <option value="">Select a task</option>
             </select></label><label>Action<select id="action">

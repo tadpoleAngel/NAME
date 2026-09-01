@@ -12,10 +12,19 @@
   },
   "permissions": [
     "storage",
-    "tabs"
+    "tabs",
+    "scripting"
   ],
+  "externally_connectable": {
+    "matches": [
+      "http://localhost:3001/*",
+      "https://tadpoleangel.github.io/*"
+    ]
+  },
   "host_permissions": [
-    "http://localhost:3001/*"
+    "http://localhost:3001/*",
+    "https://name-ray5.onrender.com/*",
+    "https://tadpoleangel.github.io/*"
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

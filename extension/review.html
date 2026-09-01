@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <link rel="stylesheet" href="popup.css">
+    <title>Review Activities</title>
+    <style>
+        .review-container {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .activity-item {
+            border: 1px solid #e0e0e0;
+            border-radius: 4px;
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #f9f9f9;
+        }
+        .activity-item.pending {
+            border-left: 3px solid #4a90e2;
+        }
+        .activity-item.approved {
+            border-left: 3px solid #28a745;
+            opacity: 0.7;
+        }
+        .activity-item.discarded {
+            border-left: 3px solid #dc3545;
+            opacity: 0.5;
+        }
+        .activity-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .activity-type {
+            font-weight: bold;
+            color: #333;
+        }
+        .activity-time {
+            font-size: 12px;
+            color: #666;
+        }
+        .activity-details {
+            font-size: 13px;
+            color: #555;
+            margin-bottom: 8px;
+        }
+        .activity-actions {
+            display: flex;
+            gap: 5px;
+            flex-wrap: wrap;
+        }
+        .activity-actions button {
+            flex: 1;
+            min-width: 60px;
+            padding: 4px 8px;
+            font-size: 12px;
+        }
+        .edit-form {
+            margin-top: 10px;
+            padding-top: 10px;
+            border-top: 1px solid #ddd;
+        }
+        .edit-form label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 12px;
+        }
+        .edit-form select,
+        .edit-form input,
+        .edit-form textarea {
+            width: 100%;
+            padding: 4px;
+            margin-bottom: 5px;
+            font-size: 12px;
+            box-sizing: border-box;
+        }
+        .no-activities {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        .clear-all {
+            margin-top: 10px;
+            width: 100%;
+            padding: 8px;
+            background: #dc3545;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .clear-all:hover {
+            background: #c82333;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #ddd;
+        }
+        .tab {
+            flex: 1;
+            padding: 8px;
+            text-align: center;
+            cursor: pointer;
+            background: #f0f0f0;
+            border: none;
+            border-bottom: 2px solid transparent;
+        }
+        .tab.active {
+            background: white;
+            border-bottom: 2px solid #4a90e2;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+    </style>
+</head>
+
+<body>
+    <header><span>MATTER WORKFLOW</span>
+        <h1>Activity Review</h1>
+    </header>
+    <main>
+        <div class="tabs">
+            <button class="tab active" data-tab="manual">Manual Log</button>
+            <button class="tab" data-tab="auto">Auto Review</button>
+        </div>
+        
+        <div id="manual-tab" class="tab-content active">
+            <p class="notice">Only selected metadata is sent. Page content is never read.</p>
+            <div id="syncSection" style="display: none;">
+                <button id="syncToken" style="margin-bottom: 10px; font-size: 12px; padding: 5px;">Sync Token from Main App</button>
+                <p class="notice" id="syncStatus"></p>
+                <p class="notice" style="font-size: 11px; color: #666;">Click sync while on the main app to enable logging on any site</p>
+            </div>
+            <label>User<select
+                    id="user"></select></label><label>Assigned task<select id="task">
+                    <option value="">Select a task</option>
+                </select></label><label>Action<select id="action">
+                    <option value="opened">Opened</option>
+                    <option value="updated">Updated</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="submitted">Submitted</option>
+                    <option value="completed">Completed</option>
+                </select></label><label>Axon record reference <input id="record" maxlength="256"
+                    placeholder="Optional claim / record ID"></label><label>Completion note <textarea id="attestation"
+                    maxlength="1000" placeholder="Optional attestation"></textarea></label><button id="send">Log declared
+                action</button>
+            <p id="result" role="status"></p>
+        </div>
+        
+        <div id="auto-tab" class="tab-content">
+            <p class="notice">Review and approve automatically detected activities from Axon.</p>
+            <div id="activities-container" class="review-container">
+                <div class="no-activities">No pending activities detected yet.</div>
+            </div>
+            <button id="clearAll" class="clear-all" style="display: none;">Clear All Activities</button>
+        </div>
+    </main>
+    <script src="popup.js"></script>
+</body>
+
+</html>

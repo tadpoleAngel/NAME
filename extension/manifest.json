@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Privileged Matter Activity Capture",
-  "version": "0.1.0",
-  "description": "Explicit, task-scoped metadata-only activity declarations.",
+  "version": "0.2.0",
+  "description": "Automatic and manual task-scoped metadata-only activity declarations.",
   "action": {
-    "default_popup": "popup.html",
+    "default_popup": "review.html",
     "default_title": "Log task activity"
   },
   "background": {
@@ -13,7 +13,8 @@
   "permissions": [
     "storage",
     "tabs",
-    "scripting"
+    "scripting",
+    "activeTab"
   ],
   "externally_connectable": {
     "matches": [
@@ -24,7 +25,15 @@
   "host_permissions": [
     "http://localhost:3001/*",
     "https://name-ray5.onrender.com/*",
-    "https://tadpoleangel.github.io/*"
+    "https://tadpoleangel.github.io/*",
+    "<all_urls>"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ],
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'self'"

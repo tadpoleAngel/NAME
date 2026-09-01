@@ -76,24 +76,23 @@ async function syncTokenFromMainApp() {
     
     $('#syncStatus').textContent = 'Syncing...';
     
-    // Use Chrome scripting API for Manifest V3
-    const injectionResults = await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      func: () => {
-        return localStorage.getItem('auth_token');
+    // Use message-based approach instead of script injection to avoid eval() warnings
+    chrome.tabs.sendMessage(tab.id, { action: 'getAuthToken' }, (response) => {
+      if (chrome.runtime.lastError) {
+        console.log('Could not get token from page:', chrome.runtime.lastError.message);
+        $('#syncStatus').textContent = 'Could not access token. Try manual entry.';
+        return;
+      }
+      
+      if (response && response.token) {
+        chrome.storage.local.set({ auth_token: response.token }, () => {
+          $('#syncStatus').textContent = 'Token synced successfully!';
+          load();
+        });
+      } else {
+        $('#syncStatus').textContent = 'No token found in current tab. Please login to the main app first.';
       }
     });
-    
-    if (injectionResults && injectionResults[0] && injectionResults[0].result) {
-      const token = injectionResults[0].result;
-      // Store it in extension storage
-      await chrome.storage.local.set({ auth_token: token });
-      $('#syncStatus').textContent = 'Token synced successfully!';
-      // Reload the data (this will hide the sync section)
-      load();
-    } else {
-      $('#syncStatus').textContent = 'No token found in current tab. Please login to the main app first.';
-    }
   } catch (e) {
     console.log('Sync failed:', e);
     $('#syncStatus').textContent = 'Sync failed: ' + e.message;

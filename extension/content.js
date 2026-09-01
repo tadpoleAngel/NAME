@@ -179,6 +179,12 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       detected: activityDetected
     });
   }
+  
+  if (request.action === 'getAuthToken') {
+    // Get auth token from localStorage if it exists
+    const token = localStorage.getItem('auth_token');
+    sendResponse({ token: token || null });
+  }
 });
 
 // Initialize on page load
